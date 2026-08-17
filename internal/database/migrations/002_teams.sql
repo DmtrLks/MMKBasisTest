@@ -1,0 +1,12 @@
+CREATE TABLE teams (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    created_by BIGINT UNSIGNED NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+
+    CONSTRAINT fk_teams_created_by
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+) ENGINE=InnoDB;

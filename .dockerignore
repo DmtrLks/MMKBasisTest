@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+.env.docker
+tmp
+redirect.pdf
+Dockerfile*
+docker-compose*.yml
+docs
+tests

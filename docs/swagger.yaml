@@ -1,0 +1,912 @@
+openapi: 3.0.3
+info:
+  title: Task Manager API
+  version: 1.0.0
+  description: API для управления командами, задачами, комментариями и отчетами.
+
+servers:
+  - url: http://localhost:8080
+    description: Локальный сервер
+
+tags:
+  - name: System
+  - name: Auth
+  - name: Teams
+  - name: Tasks
+  - name: Comments
+  - name: History
+  - name: Statistics
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: health
+      summary: Проверить состояние API
+      security: []
+      responses:
+        "200":
+          description: API работает
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/v1/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Зарегистрировать пользователя
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Пользователь зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Получить JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: JWT выдан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/teams:
+    post:
+      tags: [Teams]
+      operationId: createTeam
+      summary: Создать команду
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeamRequest"
+      responses:
+        "201":
+          description: Команда создана, текущий пользователь назначен owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      tags: [Teams]
+      operationId: listTeams
+      summary: Получить команды текущего пользователя
+      responses:
+        "200":
+          description: Список команд
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Team"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/teams/{id}/invite:
+    post:
+      tags: [Teams]
+      operationId: inviteTeamMember
+      summary: Добавить пользователя в команду
+      description: Доступно owner и admin. Роль owner через приглашение не выдается.
+      parameters:
+        - $ref: "#/components/parameters/TeamID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteRequest"
+      responses:
+        "201":
+          description: Участник добавлен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMember"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/teams/{id}/members/{user_id}:
+    patch:
+      tags: [Teams]
+      operationId: updateTeamMemberRole
+      summary: Изменить роль участника команды
+      description: >-
+        Доступно только создателю команды (owner). Роль owner выдать нельзя,
+        роль самого создателя изменить нельзя.
+      parameters:
+        - $ref: "#/components/parameters/TeamID"
+        - $ref: "#/components/parameters/MemberUserID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRoleRequest"
+      responses:
+        "200":
+          description: Роль участника обновлена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMember"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/tasks:
+    post:
+      tags: [Tasks]
+      operationId: createTask
+      summary: Создать задачу
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Задача создана вместе с первой записью истории
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      tags: [Tasks]
+      operationId: listTasks
+      summary: Получить задачи команды
+      description: Результат кешируется в Redis с учетом фильтров и пагинации.
+      parameters:
+        - name: team_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TaskStatus"
+        - name: assignee_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Список задач
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/tasks/{id}:
+    put:
+      tags: [Tasks]
+      operationId: updateTask
+      summary: Обновить задачу
+      description: Использует optimistic locking. Version должна совпадать с текущей версией задачи.
+      parameters:
+        - $ref: "#/components/parameters/TaskID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskRequest"
+      responses:
+        "200":
+          description: Задача обновлена, изменение записано в историю
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Передана устаревшая версия задачи
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: version_conflict
+                  message: task was changed by another request
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/tasks/{id}/comments:
+    post:
+      tags: [Comments]
+      operationId: createTaskComment
+      summary: Добавить комментарий к задаче
+      parameters:
+        - $ref: "#/components/parameters/TaskID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+      responses:
+        "201":
+          description: Комментарий создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    get:
+      tags: [Comments]
+      operationId: listTaskComments
+      summary: Получить комментарии задачи
+      parameters:
+        - $ref: "#/components/parameters/TaskID"
+      responses:
+        "200":
+          description: Комментарии в хронологическом порядке
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/tasks/{id}/history:
+    get:
+      tags: [History]
+      operationId: listTaskHistory
+      summary: Получить историю изменений задачи
+      parameters:
+        - $ref: "#/components/parameters/TaskID"
+      responses:
+        "200":
+          description: История от создания к последним изменениям
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HistoryEntry"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/teams/{team_id}/stats:
+    get:
+      tags: [Statistics]
+      operationId: getTeamStatistics
+      summary: Получить SQL-отчет команды
+      description: Доступно только owner и admin.
+      parameters:
+        - $ref: "#/components/parameters/StatsTeamID"
+      responses:
+        "200":
+          description: Статистика одной команды
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatisticsReport"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TeamID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    TaskID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    MemberUserID:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    StatsTeamID:
+      name: team_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+  responses:
+    BadRequest:
+      description: Некорректный JSON или параметры запроса
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: JWT отсутствует или недействителен
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Недостаточно прав или нет доступа к команде
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Запрошенная сущность не найдена
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Конфликт состояния или уникальности
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Превышен лимит запросов для IP-адреса клиента
+      headers:
+        Retry-After:
+          description: Время до повторной попытки в секундах
+          schema:
+            type: integer
+            example: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+
+    User:
+      type: object
+      required: [id, email, name, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          format: int64
+          description: Время жизни токена в секундах
+
+    CreateTeamRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+
+    TeamRole:
+      type: string
+      enum: [owner, admin, member]
+
+    Team:
+      type: object
+      required: [id, name, created_by, created_at, role]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        created_by:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        role:
+          $ref: "#/components/schemas/TeamRole"
+
+    InviteRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, role]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          minimum: 1
+        role:
+          type: string
+          enum: [admin, member]
+
+    UpdateMemberRoleRequest:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+
+    TeamMember:
+      type: object
+      required: [team_id, user_id, role]
+      properties:
+        team_id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        role:
+          $ref: "#/components/schemas/TeamRole"
+
+    TaskStatus:
+      type: string
+      enum: [todo, in_progress, done]
+
+    CreateTaskRequest:
+      type: object
+      additionalProperties: false
+      required: [team_id, title]
+      properties:
+        team_id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        status:
+          allOf:
+            - $ref: "#/components/schemas/TaskStatus"
+          default: todo
+        assignee_id:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+
+    UpdateTaskRequest:
+      type: object
+      additionalProperties: false
+      required: [version]
+      anyOf:
+        - required: [title]
+        - required: [description]
+        - required: [status]
+        - required: [assignee_id]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        assignee_id:
+          type: integer
+          format: int64
+          minimum: 1
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+
+    Task:
+      type: object
+      required:
+        - id
+        - team_id
+        - title
+        - description
+        - status
+        - created_by
+        - assignee_id
+        - created_at
+        - updated_at
+        - closed_at
+        - version
+      properties:
+        id:
+          type: integer
+          format: int64
+        team_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        created_by:
+          type: integer
+          format: int64
+        assignee_id:
+          type: integer
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: integer
+          format: int64
+
+    CreateCommentRequest:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 65535
+
+    Comment:
+      type: object
+      required: [id, task_id, user_id, content, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        task_id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    FieldChange:
+      type: object
+      required: [old, new]
+      properties:
+        old:
+          nullable: true
+          description: Предыдущее значение поля
+        new:
+          nullable: true
+          description: Новое значение поля
+
+    HistoryEntry:
+      type: object
+      required: [id, task_id, changed_by, changes, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        task_id:
+          type: integer
+          format: int64
+        changed_by:
+          type: integer
+          format: int64
+        changes:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/FieldChange"
+        created_at:
+          type: string
+          format: date-time
+
+    TaskCounts:
+      type: object
+      required: [todo, in_progress, done]
+      properties:
+        todo:
+          type: integer
+          format: int64
+        in_progress:
+          type: integer
+          format: int64
+        done:
+          type: integer
+          format: int64
+
+    TopAssignee:
+      type: object
+      required: [user_id, name, closed_tasks]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        closed_tasks:
+          type: integer
+          format: int64
+
+    StatisticsReport:
+      type: object
+      required:
+        - team_id
+        - tasks_by_status
+        - top_assignees
+        - average_close_time_seconds
+        - comments_count
+      properties:
+        team_id:
+          type: integer
+          format: int64
+        tasks_by_status:
+          $ref: "#/components/schemas/TaskCounts"
+        top_assignees:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/TopAssignee"
+        average_close_time_seconds:
+          type: number
+          format: double
+          nullable: true
+        comments_count:
+          type: integer
+          format: int64
+
+    APIError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/APIError"
+
+security:
+  - bearerAuth: []

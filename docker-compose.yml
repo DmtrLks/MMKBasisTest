@@ -1,0 +1,71 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-manager-api
+    restart: unless-stopped
+    init: true
+
+    env_file:
+      - .env.docker
+
+    ports:
+      - "${APP_PORT:-8080}:${APP_PORT:-8080}"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:$${APP_PORT}/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  mysql:
+    image: mysql:8.4
+    container_name: task-manager-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-task_manager}
+      MYSQL_USER: ${DB_USER:-app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-app_password}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-app_password}
+
+    ports:
+      - "${DB_HOST_PORT:-3306}:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u${DB_USER:-app}", "-p${DB_PASSWORD:-app_password}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: task-manager-redis
+    restart: unless-stopped
+
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mysql_data:
+  redis_data:
